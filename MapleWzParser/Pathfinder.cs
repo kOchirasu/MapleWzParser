@@ -1,18 +1,96 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using MapleWzParser.Parsers;
 using MapleWzParser.Types;
 
 namespace MapleWzParser {
     public static class Pathfinder {
-        public static void Compute(Dictionary<int, Map> map) {
-            Dictionary<int, HashSet<int>> regions = ClusterRegions(map);
-            EnumeratePaths(map, regions);
+        public static Dictionary<int, Map> Compute() {
+            Console.SetBufferSize(150, 5000);
+            Dictionary<int, Map> mapData = MapWzParser.ParseMap();
+            CleanMapData(mapData);
+            Dictionary<int, HashSet<int>> regions = ClusterRegions(mapData);
+            EnumeratePaths(mapData, regions);
+
+            return mapData;
         }
 
-        public static Dictionary<int, HashSet<int>> ClusterRegions(Dictionary<int, Map> map) {
+        public static void Test(Dictionary<int, Map> mapData) {
+            Console.WriteLine("Pathfinder Test started, please enter a src and dst map id \"src dst\"");
+            while (true) {
+                string enter = Console.ReadLine();
+                if (enter == null || enter.Equals("exit")) break;
+                string[] data = enter.Split(' ');
+                if (data.Length != 2) continue;
+                int src, dst;
+                if (!int.TryParse(data[0], out src)) continue;
+                if (!int.TryParse(data[1], out dst)) continue;
+                if (!mapData.ContainsKey(src)) {
+                    Console.WriteLine("Invalid map " + src);
+                    continue;
+                }
+                if (!mapData.ContainsKey(dst)) {
+                    Console.WriteLine("Invalid map " + dst);
+                    continue;
+                }
+
+                // Already on map
+                if (src == dst) {
+                    Console.WriteLine(src);
+                    Console.WriteLine("Arrived in 0 moves...");
+                    continue;
+                }
+
+                // Can arrive in 1 move
+                if (mapData[src].Portals.ContainsKey(dst)) {
+                    Console.WriteLine(src + " -> " + dst);
+                    Console.WriteLine("Arrived in 1 move...");
+                    continue;
+                }
+
+                // Can't reach dst
+                if (!mapData[src].Choice.ContainsKey(dst)) {
+                    Console.WriteLine("From " + src + " to " + dst + " is unreachable...");
+                    continue;
+                }
+
+                Console.Write(src);
+                int cur = src;
+                int count = 0;
+                while (cur != dst) {
+                    cur = mapData[cur].Choice[dst];
+                    Console.Write(" -> " + cur);
+                    count++;
+                }
+                Console.WriteLine("\nArrived in " + count + " move(s)...");
+            }
+        }
+
+        private static void CleanMapData(Dictionary<int, Map> mapData) {
+            Console.WriteLine("Removing useless maps...");
+
+            HashSet<int> allMaps = new HashSet<int>(mapData.Keys);
+            foreach (var node in mapData.Values) {
+                foreach (int dst in node.Portals.Keys) {
+                    allMaps.Remove(dst);
+                }
+            }
+
+            // Remove maps that are never a destination?
+            foreach (int id in allMaps) {
+                mapData.Remove(id);
+            }
+            // Remove portal destinations that are now invalid
+            foreach (var node in mapData.Values) {
+                node.Portals = node.Portals.Where(pair => mapData.ContainsKey(pair.Key)).
+                    ToDictionary(pair => pair.Key, pair => pair.Value);
+            }
+        }
+
+        private static Dictionary<int, HashSet<int>> ClusterRegions(Dictionary<int, Map> mapData) {
             Dictionary<int, HashSet<int>> regions = new Dictionary<int, HashSet<int>>();
-            HashSet<int> allMaps = new HashSet<int>(map.Keys);
+            HashSet<int> allMaps = new HashSet<int>(mapData.Keys);
             HashSet<int> remMaps = new HashSet<int>();
 
             int totalRegions = 0;
@@ -22,15 +100,15 @@ namespace MapleWzParser {
             while (allMaps.Count > 0) {
                 int test = allMaps.First();
                 // No portals, nothing to check
-                if (map[test].Portals.Count == 0) {
+                if (mapData[test].Portals.Count == 0) {
                     allMaps.Remove(test);
                     continue;
                 }
                 // Single portal
-                if (map[test].Portals.Count == 1) {
+                if (mapData[test].Portals.Count == 1) {
                     // If portal is 1-way ignore
-                    int m = map[test].Portals.Keys.First();
-                    if (!map[m].Portals.ContainsKey(test)) {
+                    int m = mapData[test].Portals.Keys.First();
+                    if (!mapData[m].Portals.ContainsKey(test)) {
                         allMaps.Remove(test);
                         remMaps.Add(test);
                         removed++;
@@ -38,7 +116,7 @@ namespace MapleWzParser {
                     }
                 }
 
-                HashSet<int> ret = Explore(test, map, allMaps, remMaps);
+                HashSet<int> ret = Explore(test, mapData, allMaps, remMaps);
                 if (ret.Count == 1) continue; // Ignore this for now (Maps that have multiple choices, but each of those choices have no choice
                 regions[regionCount] = ret;
 
@@ -56,18 +134,16 @@ namespace MapleWzParser {
             return regions;
         }
 
-        public static void EnumeratePaths(Dictionary<int, Map> map, Dictionary<int, HashSet<int>> regions) {
+        private static void EnumeratePaths(Dictionary<int, Map> mapData, Dictionary<int, HashSet<int>> regions) {
             foreach (KeyValuePair<int, HashSet<int>> entry in regions) {
-                Console.Write(entry.Key + ", ");
-
                 // No Stops
                 foreach (int src in entry.Value) {
                     foreach (int dst in entry.Value) {
                         if (src == dst) continue;
                         // Adjacent
-                        if (map[src].Portals.ContainsKey(dst)) {
-                            map[src].Choice[dst] = dst;
-                            map[src].Weight[dst] = 1;
+                        if (mapData[src].Portals.ContainsKey(dst)) {
+                            mapData[src].Choice[dst] = dst;
+                            mapData[src].Weight[dst] = 1;
                         }
                     }
                 }
@@ -75,21 +151,20 @@ namespace MapleWzParser {
                 // Try Stops
                 foreach (int stp in entry.Value) {
                     foreach (int src in entry.Value) {
-                        if (src == stp)
-                            continue;
+                        if (src == stp) continue;
                         foreach (int dst in entry.Value) {
                             // Path is done
                             if (dst == stp || src == dst) continue;
 
                             // Path is impossible
-                            if (!map[stp].Weight.ContainsKey(dst) || map[stp].Weight[dst] == 0) continue;
-                            if (!map[src].Weight.ContainsKey(stp) || map[src].Weight[stp] == 0) continue;
+                            if (!mapData[stp].Weight.ContainsKey(dst) || mapData[stp].Weight[dst] == 0) continue;
+                            if (!mapData[src].Weight.ContainsKey(stp) || mapData[src].Weight[stp] == 0) continue;
 
                             // Path is possible
-                            int weight = map[src].Weight[stp] + map[stp].Weight[dst];
-                            if (!map[src].Weight.ContainsKey(dst) || weight < map[src].Weight[dst]) {
-                                map[src].Choice[dst] = map[src].Choice[stp];
-                                map[src].Weight[dst] = weight;
+                            int weight = mapData[src].Weight[stp] + mapData[stp].Weight[dst];
+                            if (!mapData[src].Weight.ContainsKey(dst) || weight < mapData[src].Weight[dst]) {
+                                mapData[src].Choice[dst] = mapData[src].Choice[stp];
+                                mapData[src].Weight[dst] = weight;
                             }
                         }
                     }
@@ -97,21 +172,7 @@ namespace MapleWzParser {
             }
         }
 
-        public static void CleanMapData(Dictionary<int, List<PortalInfo>> mapData) {
-            Console.WriteLine("Removing useless maps...");
-            HashSet<int> allMaps = new HashSet<int>(mapData.Keys);
-            foreach (List<PortalInfo> map in mapData.Values) {
-                foreach (var p in map) {
-                    allMaps.Remove(p.DstId);
-                }
-            }
-            
-            foreach (int id in allMaps) {
-                mapData.Remove(id);
-            }
-        }
-
-        public static HashSet<int> Explore(int id, IReadOnlyDictionary<int, Map> index, ICollection<int> universe, ICollection<int> ignored) {
+        private static HashSet<int> Explore(int id, IReadOnlyDictionary<int, Map> index, ICollection<int> universe, ICollection<int> ignored) {
             HashSet<int> results = new HashSet<int>();
             Queue<int> queue = new Queue<int>();
             queue.Enqueue(id);
@@ -133,11 +194,9 @@ namespace MapleWzParser {
                         }
                         continue; // One-way portals, Ignore for now
                     }
-
                     queue.Enqueue(map);
                 }
             }
-
             return results;
         }
     }

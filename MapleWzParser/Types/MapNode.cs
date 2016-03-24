@@ -1,15 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 
 namespace MapleWzParser.Types {
     public class MapNode {
         public int Id { get; }
-        public IDictionary<int, Tuple<short[], string>> Portals;
+        public IDictionary<int, PortalInfo> Portals;
         public IDictionary<int, int> Choice { get; set; }
 
-        public MapNode(int id, IDictionary<int, Tuple<short[], string>> portals, IDictionary<int, int> choice) {
+        public MapNode(int id, IDictionary<int, PortalInfo> portals, IDictionary<int, int> choice) {
             Id = id;
             Portals = portals;
             Choice = choice;
@@ -19,23 +18,27 @@ namespace MapleWzParser.Types {
             Id = reader.ReadInt32();
 
             int count = reader.ReadInt32();
-            Dictionary<int, Tuple<short[], string>> portals = new Dictionary<int, Tuple<short[], string>>(count);
-            Portals = new ReadOnlyDictionary<int, Tuple<short[], string>>(portals);
+            Dictionary<int, PortalInfo> portals = new Dictionary<int, PortalInfo>(count);
             for (int i = 0; i < count; i++) {
                 int key = reader.ReadInt32();
-                short[] coord = { reader.ReadInt16(), reader.ReadInt16() };
-                Tuple<short[], string> tuple = new Tuple<short[], string>(coord, reader.ReadString());
-                portals[key] = tuple;
+                portals[key] = new PortalInfo {
+                    X = reader.ReadInt16(),
+                    Y = reader.ReadInt16(),
+                    Name = reader.ReadString()
+                };
             }
 
             count = reader.ReadInt32();
             Dictionary<int, int> choice = new Dictionary<int, int>(count);
-            Choice = new ReadOnlyDictionary<int, int>(choice);
             for (int i = 0; i < count; i++) {
                 int key = reader.ReadInt32();
                 int value = reader.ReadInt32();
                 choice[key] = value;
             }
+
+            // Assign Dictionaries
+            Portals = new ReadOnlyDictionary<int, PortalInfo>(portals);
+            Choice = new ReadOnlyDictionary<int, int>(choice);
         }
 
         public override bool Equals(object o) {

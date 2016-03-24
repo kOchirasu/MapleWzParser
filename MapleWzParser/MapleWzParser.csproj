@@ -47,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Parsers\MapWzParser.cs" />
+    <Compile Include="Pathfinder.cs" />
     <Compile Include="Serializer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -66,6 +67,7 @@
     <Compile Include="reWZ\WZProperties\WZProperty.cs" />
     <Compile Include="reWZ\WZProperties\WZSubProperty.cs" />
     <Compile Include="Parsers\StringWzParser.cs" />
+    <Compile Include="Types\Map.cs" />
     <Compile Include="Types\MapNode.cs" />
     <Compile Include="Types\PortalInfo.cs" />
   </ItemGroup>

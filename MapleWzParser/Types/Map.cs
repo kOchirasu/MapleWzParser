@@ -4,27 +4,23 @@ using System.Text;
 
 namespace MapleWzParser.Types {
     public class Map : MapNode {
-        public new Dictionary<int, short[]> Portals { get; set; }
-        public Dictionary<int, string> Cmd { get; set; }
+        public IDictionary<int, int> Weight { get; set; }
 
-        public Dictionary<int, int> Weight { get; set; }
-
-        public Map(int id) : base(id, null, new Dictionary<int, int>()) {
+        public Map(int id, IDictionary<int, PortalInfo> portals) : base(id, portals, new Dictionary<int, int>()) {
             Weight = new Dictionary<int, int>();
-            Portals = new Dictionary<int, short[]>();
-            Cmd = new Dictionary<int, string>();
         }
 
         public void WriteTo(BinaryWriter writer) {
             writer.Write(Id);
-            writer.Write(Portals.Count);
 
+            writer.Write(Portals.Count);
             foreach (int key in Portals.Keys) {
                 writer.Write(key);
-                writer.Write(Portals[key][0]);
-                writer.Write(Portals[key][1]);
-                writer.Write(Cmd[key]);
+                writer.Write(Portals[key].X);
+                writer.Write(Portals[key].Y);
+                writer.Write(Portals[key].Name);
             }
+
             writer.Write(Choice.Count);
             foreach (KeyValuePair<int, int> pair in Choice) {
                 writer.Write(pair.Key);
@@ -35,8 +31,8 @@ namespace MapleWzParser.Types {
         public override string ToString() {
             var sb = new StringBuilder();
             sb.AppendLine(Id.ToString());
-            foreach (KeyValuePair<int, short[]> entry in Portals) {
-                sb.AppendLine("\t" + entry.Key + " : " + entry.Value[0] + ", " + entry.Value[1]);
+            foreach (KeyValuePair<int, PortalInfo> entry in Portals) {
+                sb.AppendLine("\t" + entry.Key + ":" + entry.Value);
             }
             return sb.ToString();
         }

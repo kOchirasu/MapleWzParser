@@ -17,8 +17,7 @@ namespace MapleWzParser {
 
             Serializer.Save(OUTPUT + "name.map", StringWzParser.ParseMap());*/
 
-            //Dictionary<int, List<PortalInfo>> temp = MapWzParser.ParseMap();
-            //Console.WriteLine(temp.Count);
+            //Serializer.Save(OUTPUT + "node.map", Pathfinder.Compute());
 
             Console.WriteLine("Complete!");
             Console.WriteLine("Press ENTER to continue.");
